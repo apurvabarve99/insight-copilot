@@ -27,8 +27,7 @@ def load_data():
     )
 
     df = pd.read_excel(data_path)
-    # Read the Excel file
-    df = pd.read_excel(DATA_FILE)
+    
 
     # Convert Date column to pandas datetime
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
