@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import os
 import pandas as pd
 
 
@@ -16,11 +16,17 @@ def load_data():
     """
 
     # Check whether the dataset exists
-    if not DATA_FILE.exists():
-        raise FileNotFoundError(
-            f"Dataset not found at: {DATA_FILE}"
-        )
+    data_path = Path(
+    os.getenv("INSIGHT_COPILOT_DATA_PATH", str(DATA_FILE))
+)
 
+    if not data_path.exists():
+        raise FileNotFoundError(
+        f"Dataset not found at: {data_path}. "
+        "Please upload the sales dataset."
+    )
+
+    df = pd.read_excel(data_path)
     # Read the Excel file
     df = pd.read_excel(DATA_FILE)
 

@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import streamlit as st
 
 from agent.graph import graph
@@ -14,7 +17,26 @@ st.write(
     "Ask questions about the sales dataset and get "
     "data-driven insights."
 )
+# Use the local dataset when available.
+# On Streamlit Cloud, allow the user to upload the dataset.
+default_data_path = Path("data/Sales_Dataset_2024.xlsx")
 
+if not default_data_path.exists():
+    uploaded_file = st.file_uploader(
+        "Upload the sales dataset (.xlsx)",
+        type=["xlsx"]
+    )
+
+    if uploaded_file is not None:
+        uploaded_path = Path("/tmp/Sales_Dataset_2024.xlsx")
+        uploaded_path.write_bytes(uploaded_file.getvalue())
+
+        os.environ["INSIGHT_COPILOT_DATA_PATH"] = str(uploaded_path)
+
+        st.success("Dataset uploaded successfully.")
+    else:
+        st.info("Please upload the sales dataset to start analyzing.")
+        st.stop()
 
 # --------------------------------------------------
 # Conversation History
