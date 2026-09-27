@@ -662,6 +662,134 @@ def generate_insight(state):
                     "Fast path used: percentage change calculation answered directly."
                 ]
             }
+    # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # CLOUD FALLBACK
+    # Streamlit Cloud does not have access to local Ollama.
+    # Use deterministic tool results instead of calling Qwen.
+    # ---------------------------------------------------------
+    if os.getenv("INSIGHT_COPILOT_DATA_PATH"):
+        ranking = tool_results.get("ranking", [])
+        trend_data = tool_results.get("trend", [])
+        comparison = tool_results.get("comparison", [])
+        anomalies = tool_results.get("anomaly", [])
+        calculation = tool_results.get("calculation", {})
+
+        if ranking:
+            top_result = ranking[0]
+            group_column = next(
+                (key for key in top_result if key != "Revenue"),
+                "Item"
+            )
+
+            return {
+                "final_answer": (
+                    f"The {group_column.lower()} with the highest revenue is "
+                    f"{top_result[group_column]} "
+                    f"({top_result['Revenue']:,.0f})."
+                ),
+                "execution_log": execution_log + [
+                    "Cloud fallback used: ranking result summarized without Ollama."
+                ]
+            }
+
+        if trend_data:
+            highest_month = max(
+                trend_data,
+                key=lambda row: row["Revenue"]
+            )
+            lowest_month = min(
+                trend_data,
+                key=lambda row: row["Revenue"]
+            )
+
+            return {
+                "final_answer": (
+                    f"Monthly revenue ranged from "
+                    f"{lowest_month['Revenue']:,.0f} to "
+                    f"{highest_month['Revenue']:,.0f} during the year. "
+                    f"The highest month was {highest_month['Month']} "
+                    f"({highest_month['Revenue']:,.0f}), while the lowest "
+                    f"was {lowest_month['Month']} "
+                    f"({lowest_month['Revenue']:,.0f})."
+                ),
+                "execution_log": execution_log + [
+                    "Cloud fallback used: trend result summarized without Ollama."
+                ]
+            }
+
+        if comparison:
+            top_result = comparison[0]
+            metric_columns = [
+                key for key in top_result
+                if key not in [
+                    "Region",
+                    "Product",
+                    "Category",
+                    "Salesperson"
+                ]
+            ]
+
+            if metric_columns:
+                metric = metric_columns[0]
+                group_column = next(
+                    key for key in top_result
+                    if key != metric
+                )
+
+                return {
+                    "final_answer": (
+                        f"{top_result[group_column]} has the highest "
+                        f"{metric.lower()} at "
+                        f"{top_result[metric]:,.0f}."
+                    ),
+                    "execution_log": execution_log + [
+                        "Cloud fallback used: comparison result summarized without Ollama."
+                    ]
+                }
+
+        if anomalies:
+            return {
+                "final_answer": (
+                    f"I found {len(anomalies)} potential anomalies "
+                    f"using the IQR-based detection method."
+                ),
+                "execution_log": execution_log + [
+                    "Cloud fallback used: anomaly results summarized without Ollama."
+                ]
+            }
+
+        if calculation:
+            operation = calculation.get("operation")
+            metric = calculation.get("metric")
+            result = calculation.get("result")
+
+            if operation == "sum" and result is not None:
+                return {
+                    "final_answer": (
+                        f"The total {metric.lower().replace('_', ' ')} "
+                        f"is {result:,.2f}."
+                    ),
+                    "execution_log": execution_log + [
+                        "Cloud fallback used: calculation result summarized without Ollama."
+                    ]
+                }
+
+            if (
+                operation == "percentage_change"
+                and result is not None
+            ):
+                return {
+                    "final_answer": (
+                        f"The {metric.lower().replace('_', ' ')} changed by "
+                        f"{result:.2f}% from "
+                        f"{calculation.get('from_period')} to "
+                        f"{calculation.get('to_period')}."
+                    ),
+                    "execution_log": execution_log + [
+                        "Cloud fallback used: percentage change summarized without Ollama."
+                    ]
+                }
 
     # ---------------------------------------------------------
     # LLM PATH
