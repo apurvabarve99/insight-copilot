@@ -845,14 +845,210 @@ Important rules:
 Return only the final analyst answer.
 """
 
-    response = llm.invoke(prompt)
+    try:
+        response = llm.invoke(prompt)
 
-    return {
-        "final_answer": response.content,
-        "execution_log": state.get("execution_log", []) + [
-            "Insight generated using Qwen because the question required reasoning."
-        ]
-    }
+        return {
+            "final_answer": response.content,
+            "execution_log": state.get("execution_log", []) + [
+                "Insight generated using Qwen because the question required reasoning."
+            ]
+        }
+
+    except Exception:
+        # Ollama is available locally but not on Streamlit Cloud.
+        # Fall back to deterministic tool results if the LLM is unavailable.
+
+        ranking = tool_results.get("ranking", [])
+        trend_data = tool_results.get("trend", [])
+        comparison = tool_results.get("comparison", [])
+        anomalies = tool_results.get("anomaly", [])
+        calculation = tool_results.get("calculation", {})
+
+        # Ranking + trend
+        if ranking and trend_data:
+            top_result = ranking[0]
+
+            group_column = next(
+                (key for key in top_result if key != "Revenue"),
+                "Product"
+            )
+
+            top_item = top_result[group_column]
+            top_value = top_result["Revenue"]
+
+            highest_month = max(
+                trend_data,
+                key=lambda row: row["Revenue"]
+            )
+
+            lowest_month = min(
+                trend_data,
+                key=lambda row: row["Revenue"]
+            )
+
+            return {
+                "final_answer": (
+                    f"{top_item} generated the highest revenue at "
+                    f"{top_value:,.0f}.\n\n"
+                    f"Its monthly revenue ranged from "
+                    f"{lowest_month['Revenue']:,.0f} to "
+                    f"{highest_month['Revenue']:,.0f} during the year. "
+                    f"The highest month was "
+                    f"{highest_month['Month']} "
+                    f"({highest_month['Revenue']:,.0f}), while the lowest "
+                    f"was {lowest_month['Month']} "
+                    f"({lowest_month['Revenue']:,.0f})."
+                ),
+                "execution_log": execution_log + [
+                    "Qwen was unavailable, so deterministic tool results "
+                    "were used to generate the answer."
+                ]
+            }
+
+        # Ranking
+        if ranking:
+            top_result = ranking[0]
+
+            group_column = next(
+                (key for key in top_result if key != "Revenue"),
+                "Item"
+            )
+
+            return {
+                "final_answer": (
+                    f"The {group_column.lower()} with the highest revenue is "
+                    f"{top_result[group_column]} "
+                    f"({top_result['Revenue']:,.0f})."
+                ),
+                "execution_log": execution_log + [
+                    "Qwen was unavailable, so deterministic tool results "
+                    "were used to generate the answer."
+                ]
+            }
+
+        # Trend
+        if trend_data:
+            highest_month = max(
+                trend_data,
+                key=lambda row: row["Revenue"]
+            )
+
+            lowest_month = min(
+                trend_data,
+                key=lambda row: row["Revenue"]
+            )
+
+            return {
+                "final_answer": (
+                    f"Monthly revenue ranged from "
+                    f"{lowest_month['Revenue']:,.0f} to "
+                    f"{highest_month['Revenue']:,.0f} during the year. "
+                    f"The highest month was {highest_month['Month']} "
+                    f"({highest_month['Revenue']:,.0f}), while the lowest "
+                    f"was {lowest_month['Month']} "
+                    f"({lowest_month['Revenue']:,.0f})."
+                ),
+                "execution_log": execution_log + [
+                    "Qwen was unavailable, so deterministic tool results "
+                    "were used to generate the answer."
+                ]
+            }
+
+        # Comparison
+        if comparison:
+            top_result = comparison[0]
+
+            metric_columns = [
+                key for key in top_result
+                if key not in [
+                    "Region",
+                    "Product",
+                    "Category",
+                    "Salesperson"
+                ]
+            ]
+
+            if metric_columns:
+                metric = metric_columns[0]
+
+                group_column = next(
+                    key for key in top_result
+                    if key != metric
+                )
+
+                return {
+                    "final_answer": (
+                        f"{top_result[group_column]} has the highest "
+                        f"{metric.lower()} at "
+                        f"{top_result[metric]:,.0f}."
+                    ),
+                    "execution_log": execution_log + [
+                        "Qwen was unavailable, so deterministic tool results "
+                        "were used to generate the answer."
+                    ]
+                }
+
+        # Anomaly
+        if anomalies:
+            return {
+                "final_answer": (
+                    f"I found {len(anomalies)} potential anomalies "
+                    f"using the IQR-based detection method."
+                ),
+                "execution_log": execution_log + [
+                    "Qwen was unavailable, so deterministic tool results "
+                    "were used to generate the answer."
+                ]
+            }
+
+        # Calculation
+        if calculation:
+            operation = calculation.get("operation")
+            metric = calculation.get("metric")
+            result = calculation.get("result")
+
+            if operation == "sum" and result is not None:
+                return {
+                    "final_answer": (
+                        f"The total "
+                        f"{metric.lower().replace('_', ' ')} "
+                        f"is {result:,.2f}."
+                    ),
+                    "execution_log": execution_log + [
+                        "Qwen was unavailable, so deterministic tool results "
+                        "were used to generate the answer."
+                    ]
+                }
+
+            if (
+                operation == "percentage_change"
+                and result is not None
+            ):
+                return {
+                    "final_answer": (
+                        f"The "
+                        f"{metric.lower().replace('_', ' ')} "
+                        f"changed by {result:.2f}% from "
+                        f"{calculation.get('from_period')} to "
+                        f"{calculation.get('to_period')}."
+                    ),
+                    "execution_log": execution_log + [
+                        "Qwen was unavailable, so deterministic tool results "
+                        "were used to generate the answer."
+                    ]
+                }
+
+        return {
+            "final_answer": (
+                "The analysis tools completed successfully, but the "
+                "language model was unavailable to generate the final response."
+            ),
+            "execution_log": execution_log + [
+                "Qwen was unavailable and no deterministic fallback matched "
+                "the requested analysis."
+            ]
+        }
 def run_ranking_tool(state):
     """
     Run ranking analysis based on the user's query.
