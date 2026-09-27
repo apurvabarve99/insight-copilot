@@ -95,14 +95,13 @@ Conditional Routing
           ↓
       Final Response
 
-      ```mermaid
-    flowchart TD
+```mermaid
+flowchart TD
     A[User Query] --> B[Query Analysis]
     B --> C[Analysis Plan]
     C --> D{Conditional Router}
 
     D -->|Unsupported| E[Unsupported Response]
-
     D -->|Supported| F[Tool Selection]
 
     F --> G[Ranking Tool]
@@ -125,7 +124,6 @@ Conditional Routing
 
     B -. Previous Conversation Context .-> F
 ```
-
 
 ### LangGraph Flow
 
