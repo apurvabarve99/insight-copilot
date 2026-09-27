@@ -668,7 +668,9 @@ def generate_insight(state):
     # Streamlit Cloud does not have access to local Ollama.
     # Use deterministic tool results instead of calling Qwen.
     # ---------------------------------------------------------
-    if os.getenv("INSIGHT_COPILOT_DATA_PATH"):
+    if (
+    os.getenv("INSIGHT_COPILOT_DATA_PATH")
+    or not os.path.exists("data/Sales_Dataset_2024.xlsx")):
         ranking = tool_results.get("ranking", [])
         trend_data = tool_results.get("trend", [])
         comparison = tool_results.get("comparison", [])
